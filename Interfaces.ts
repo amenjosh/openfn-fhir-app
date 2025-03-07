@@ -1,14 +1,15 @@
 export type ResourceType = 'Patient' | 'Observation' | 'MedicationRequest';
 
 
-interface HumanName {
-    given?: string[];
+export interface HumanName {
+    use?: string;
+    text?: string;
     family?: string;
+    given?: string[];
 }
-
 export interface Patient {
-    id?: string;
+    gender: string,
+    active?: boolean;
     name?: HumanName[];
-    gender?: string;
     birthDate?: string;
 }

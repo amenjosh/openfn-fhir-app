@@ -1,5 +1,5 @@
-import { getResourceData } from "./index";
-import { ResourceType } from "./Interfaces";
+import {getPatientResourceData} from "./index";
+import {Patient} from "./Interfaces";
 import fetch from "node-fetch";
 
 jest.mock("node-fetch", () => ({
@@ -9,63 +9,47 @@ jest.mock("node-fetch", () => ({
 
 const mockedFetch = fetch as jest.MockedFunction<typeof fetch>;
 
-describe("getResourceData", () => {
+describe("fetchPatients", () => {
     beforeEach(() => {
         mockedFetch.mockClear();
     });
 
-    it("should successfully fetch and return data", async () => {
-        const mockResponseData = {
-            resourceType: "Bundle",
-            type: "searchset",
-            total: 1,
-            link: [
-                {
-                    relation: "self",
-                    url: "https://hapi.fhir.org/baseR4/Patient?gender=male&_pretty=true&_sort=_lastUpdated&_count=1",
-                },
-            ],
-            entry: [
-                {
-                    fullUrl: "https://hapi.fhir.org/baseR4/Patient/676767",
-                    resource: {
-                        resourceType: "Patient",
-                        id: "676767",
-                        meta: {
-                            versionId: "1",
-                            lastUpdated: "2024-03-05T23:19:37.194+00:00",
-                            source: "#a946e499364a959b",
-                        },
-                        identifier: [
-                            {
-                                system: "http://example.com/fhir/ids",
-                                value: "12345",
-                            },
-                        ],
-                        gender: "male",
-                    },
-                },
-            ],
-        };
+    it("should successfully fetch and return Patient array", async () => {
+        const mockPatientData: Patient[] = [
+            {
+                gender: "male",
+                birthDate: "1999-12-25",
+                name: [{ family: "Zhou", given: ["Ziqi"] }],
+            },
+        ];
 
         mockedFetch.mockResolvedValue({
             ok: true,
-            json: async () => mockResponseData,
+            json: async () => {
+                return {resourceType: 'Bundle', entry: mockPatientData.map(patient => ({resource: patient}))};
+            },
         } as any);
 
-        const resourceType: ResourceType = "Patient";
-        const searchParams = {
+        const params = {
             gender: "male",
             _pretty: "true",
             _sort: "_lastUpdated",
             _count: "1",
         };
+        const patients = await getPatientResourceData(params);
 
-        const data = await getResourceData(resourceType, searchParams);
 
         expect(mockedFetch).toHaveBeenCalledTimes(1);
-        expect(data).toEqual(mockResponseData);
+        expect(mockedFetch).toHaveBeenCalledWith(
+            expect.stringContaining('/Patient?'),
+            expect.objectContaining({ headers: { "Accept": "application/fhir+json" } })
+        );
+        expect(Array.isArray(patients)).toBe(true);
+        expect(patients.length).toBeGreaterThan(0);
+        expect(patients[0].gender).toEqual("male");
+        expect(patients[0].birthDate).toEqual("1999-12-25");
     });
+
 
     it("should throw an error for unsuccessful fetch", async () => {
         mockedFetch.mockResolvedValue({
@@ -73,10 +57,9 @@ describe("getResourceData", () => {
             status: 404,
         } as any);
 
-        const resourceType: ResourceType = "Patient";
         const searchParams = { gender: "male" };
 
-        await expect(getResourceData(resourceType, searchParams)).rejects.toThrow(
+        await expect(getPatientResourceData(searchParams)).rejects.toThrow(
             "HTTP error! status: 404"
         );
         expect(mockedFetch).toHaveBeenCalledTimes(1);
